@@ -8,4 +8,9 @@ defmodule GithubPrMentionsWeb.PageLive do
 
     {:ok, assign(socket, oauth_github_url: oauth_github_url, current_user: current_user)}
   end
+
+  @impl true
+  def handle_event("search", params, socket) do
+    {:noreply, push_redirect(socket, to: Routes.mentions_path(socket, :index, params))}
+  end
 end

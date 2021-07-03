@@ -23,6 +23,12 @@ defmodule GithubPrMentionsWeb.Router do
     delete "/logout", GithubAuthController, :delete
   end
 
+  scope "/mentions", GithubPrMentionsWeb do
+    pipe_through [:browser, :authenticate_user]
+
+    live "/", MentionsLive, :index
+  end
+
   # Other scopes may use custom stacks.
   # scope "/api", GithubPrMentionsWeb do
   #   pipe_through :api

@@ -1,0 +1,12 @@
+<section>
+  <div class="row">
+    <h1>username: <%= @username %></h1>
+  </div>
+  <div class="row">
+    <div id="root-prs" phx-update="append">
+      <%= for pr_number <- @prs do %>
+        <%= live_component @socket, GithubPrMentionsWeb.ShowMentions, id: pr_number %>
+      <% end %>
+    </div>
+  </div>
+</section>
