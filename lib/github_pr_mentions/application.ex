@@ -12,9 +12,11 @@ defmodule GithubPrMentions.Application do
       # Start the PubSub system
       {Phoenix.PubSub, name: GithubPrMentions.PubSub},
       # Start the Endpoint (http/https)
-      GithubPrMentionsWeb.Endpoint
+      GithubPrMentionsWeb.Endpoint,
       # Start a worker by calling: GithubPrMentions.Worker.start_link(arg)
       # {GithubPrMentions.Worker, arg}
+      {Task.Supervisor, name: GithubPrMentions.TaskSupervisor},
+      GithubPrMentions.Mentions
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
