@@ -18,6 +18,7 @@ defmodule GithubPrMentionsWeb.Router do
     pipe_through :browser
 
     live "/", PageLive, :index
+    get "/auth/github/callback", GithubAuthController, :index
   end
 
   # Other scopes may use custom stacks.
