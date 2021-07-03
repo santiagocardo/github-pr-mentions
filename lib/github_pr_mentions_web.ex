@@ -66,6 +66,7 @@ defmodule GithubPrMentionsWeb do
       import Plug.Conn
       import Phoenix.Controller
       import Phoenix.LiveView.Router
+      import GithubPrMentionsWeb.Auth, only: [authenticate_user: 2]
     end
   end
 

@@ -8,6 +8,7 @@ defmodule GithubPrMentionsWeb.Router do
     plug :put_root_layout, {GithubPrMentionsWeb.LayoutView, :root}
     plug :protect_from_forgery
     plug :put_secure_browser_headers
+    plug GithubPrMentionsWeb.Auth
   end
 
   pipeline :api do
@@ -19,6 +20,7 @@ defmodule GithubPrMentionsWeb.Router do
 
     live "/", PageLive, :index
     get "/auth/github/callback", GithubAuthController, :index
+    delete "/logout", GithubAuthController, :delete
   end
 
   # Other scopes may use custom stacks.

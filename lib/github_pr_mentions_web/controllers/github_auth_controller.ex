@@ -13,4 +13,10 @@ defmodule GithubPrMentionsWeb.GithubAuthController do
     |> configure_session(renew: true)
     |> redirect(to: Routes.page_path(conn, :index))
   end
+
+  def delete(conn, _) do
+    conn
+    |> GithubPrMentionsWeb.Auth.logout()
+    |> redirect(to: Routes.page_path(conn, :index))
+  end
 end
