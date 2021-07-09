@@ -8,7 +8,6 @@ defmodule MentionsTest do
     username = "josevalim"
     token = "test token"
 
-    assert :ok = Mentions.clean()
-    assert :ok = Mentions.get_mentions(repo_url, username, token)
+    assert :ok = Mentions.get_mentions(repo_url, username, token, self())
   end
 end

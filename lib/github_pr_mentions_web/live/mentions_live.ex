@@ -5,7 +5,7 @@ defmodule GithubPrMentionsWeb.MentionsLive do
 
   @impl true
   def mount(%{"repo" => repo, "username" => username}, %{"current_user" => current_user}, socket) do
-    Mentions.get_mentions(repo, username, current_user.access_token)
+    Mentions.get_mentions(repo, username, current_user.access_token, self())
 
     if connected?(socket), do: Mentions.subscribe("lobby")
 

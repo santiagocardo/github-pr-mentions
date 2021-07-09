@@ -13,9 +13,9 @@ defmodule GithubPrMentions.Application do
       {Phoenix.PubSub, name: GithubPrMentions.PubSub},
       # Start the Endpoint (http/https)
       GithubPrMentionsWeb.Endpoint,
-      # Start a worker by calling: GithubPrMentions.Worker.start_link(arg)
-      # {GithubPrMentions.Worker, arg}
       {Task.Supervisor, name: GithubPrMentions.TaskSupervisor},
+      {Registry, [name: GithubPrMentions.Registry.Mentions, keys: :unique]},
+      {DynamicSupervisor, [name: GithubPrMentions.Supervisor.Mentions, strategy: :one_for_one]},
       GithubPrMentions.Mentions
     ]
 
