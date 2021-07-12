@@ -38,8 +38,13 @@ defmodule GithubPrMentions.Mentions do
     Phoenix.PubSub.subscribe(@pubsub, topic(content_id))
   end
 
+  def via(lv_pid) do
+    {:via, Registry, {GithubPrMentions.Registry.Mentions, lv_pid}}
+  end
+
   def init(_opts) do
     state = %{
+      id: nil,
       interval: @refresh_interval,
       timer: nil,
       prs_curr_page: %{},
@@ -67,7 +72,7 @@ defmodule GithubPrMentions.Mentions do
   end
 
   def handle_cast({:fetch_pulls, page}, state) do
-    %{base_url: base_url, token: token, prs_curr_page: prs_curr_page} = state
+    %{base_url: base_url, token: token} = state
 
     pr_numbers =
       Task.Supervisor.async(
@@ -80,49 +85,45 @@ defmodule GithubPrMentions.Mentions do
       |> Task.await()
 
     unless pr_numbers == [] do
-      Enum.each(pr_numbers, &GenServer.cast(via(state.id), {:fetch_mentions, &1, 1}))
+      mentions_to_fetch = Enum.map(pr_numbers, &{&1, 1})
 
+      GenServer.cast(via(state.id), {:fetch_mentions, mentions_to_fetch})
       GenServer.cast(via(state.id), {:fetch_pulls, page + 1})
     end
 
-    prs_curr_page = Enum.into(pr_numbers, prs_curr_page, &{&1, 1})
-
-    state = Map.put(state, :prs_curr_page, prs_curr_page)
+    state = Enum.reduce(pr_numbers, state, &put_in(&2, [:prs_curr_page, &1], 1))
 
     {:noreply, state}
   end
 
-  def handle_cast({:fetch_mentions, pr_number, page}, state) do
+  def handle_cast({:fetch_mentions, prs_data}, state) do
     %{base_url: base_url, token: token, username: username} = state
 
-    mentions =
-      Task.Supervisor.async(
-        @task_supervisor,
-        GitHub,
-        :fetch_mentions,
-        [base_url, pr_number, token, username, page],
-        shutdown: :brutal_kill
-      )
-      |> Task.await()
+    mentions = fetch_mentions(prs_data, base_url, token, username)
 
     if mentions == [] do
       {:noreply, state}
     else
-      broadcast_new_mentions({pr_number, mentions, username})
+      mentions_to_fetch =
+        Enum.map(mentions, fn {pr_number, mentions, page} ->
+          broadcast_new_mentions({pr_number, mentions, username})
 
-      GenServer.cast(via(state.id), {:fetch_mentions, pr_number, page + 1})
+          {pr_number, page + 1}
+        end)
 
-      {:noreply, put_in(state, [:prs_curr_page, pr_number], page)}
+      GenServer.cast(via(state.id), {:fetch_mentions, mentions_to_fetch})
+
+      state =
+        Enum.reduce(mentions, state, fn {pr_number, _mentions, page}, acc ->
+          put_in(acc, [:prs_curr_page, pr_number], page)
+        end)
+
+      {:noreply, state}
     end
   end
 
   def handle_info(:refresh_mentions, state) do
-    for pr_number <- Map.keys(state.prs_curr_page) do
-      GenServer.cast(
-        via(state.id),
-        {:fetch_mentions, pr_number, get_in(state, [:prs_curr_page, pr_number])}
-      )
-    end
+    GenServer.cast(via(state.id), {:fetch_mentions, Map.to_list(state.prs_curr_page)})
 
     {:noreply, schedule_refresh(state)}
   end
@@ -148,7 +149,38 @@ defmodule GithubPrMentions.Mentions do
     )
   end
 
-  def via(lv_pid) do
-    {:via, Registry, {GithubPrMentions.Registry.Mentions, lv_pid}}
+  defp fetch_mentions(prs_data, base_url, token, username) do
+    Task.Supervisor.async_stream(
+      @task_supervisor,
+      prs_data,
+      GitHub,
+      :fetch_comments,
+      [base_url, token],
+      shutdown: :brutal_kill
+    )
+    |> Enum.reduce([], &mentions_reducer(&1, &2, username))
+  end
+
+  defp mentions_reducer({:ok, response}, acc, username) do
+    case filter_comments(response, username) do
+      {_pr_number, [], _page} -> acc
+      result -> [result | acc]
+    end
+  end
+
+  defp filter_comments({pr_number, comments, page}, username) do
+    mentions =
+      comments
+      |> Enum.filter(&String.contains?(&1["body"], username))
+      |> Enum.map(
+        &%{
+          id: &1["id"],
+          body: &1["body"],
+          url: &1["html_url"],
+          updated_at: &1["updated_at"]
+        }
+      )
+
+    {pr_number, mentions, page}
   end
 end

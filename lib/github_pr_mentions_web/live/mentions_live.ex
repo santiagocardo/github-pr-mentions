@@ -9,8 +9,6 @@ defmodule GithubPrMentionsWeb.MentionsLive do
 
     if connected?(socket), do: Mentions.subscribe("lobby")
 
-    Process.send_after(self(), :check_prs, 90_000)
-
     {:ok,
      socket
      |> assign(prs: [], username: username)
@@ -26,15 +24,6 @@ defmodule GithubPrMentionsWeb.MentionsLive do
        socket
        |> assign(:prs, [pr_number])
        |> put_flash(:info, "Looking for more mentions...")}
-    else
-      {:noreply, socket}
-    end
-  end
-
-  @impl true
-  def handle_info(:check_prs, socket) do
-    if socket.assigns.prs == [] do
-      {:noreply, put_flash(socket, :error, "No mentions found!")}
     else
       {:noreply, socket}
     end

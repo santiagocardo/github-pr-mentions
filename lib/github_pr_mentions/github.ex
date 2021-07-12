@@ -6,10 +6,10 @@ defmodule GithubPrMentions.GitHub do
     |> map_pulls()
   end
 
-  def fetch_mentions(base_url, pr_number, token, username, page \\ 1) do
+  def fetch_comments({pr_number, page}, base_url, token) do
     comments_url(base_url, pr_number, page)
     |> fetch(token)
-    |> filter_mentions(username)
+    |> map_comments(pr_number, page)
   end
 
   def get_base_url(repo_url) do
@@ -54,13 +54,6 @@ defmodule GithubPrMentions.GitHub do
 
   defp map_pulls(_res), do: []
 
-  defp filter_mentions({:ok, comments}, username) do
-    comments
-    |> Enum.filter(&String.contains?(&1["body"], username))
-    |> Enum.map(
-      &%{id: &1["id"], body: &1["body"], url: &1["html_url"], updated_at: &1["updated_at"]}
-    )
-  end
-
-  defp filter_mentions(_response, _username), do: []
+  defp map_comments({:ok, comments}, pr_number, page), do: {pr_number, comments, page}
+  defp map_comments(_res, pr_number, page), do: {pr_number, [], page}
 end
