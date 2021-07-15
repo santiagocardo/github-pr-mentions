@@ -5,8 +5,6 @@ defmodule GithubPrMentions.Mentions do
 
   @refresh_interval :timer.seconds(60)
   @task_supervisor GithubPrMentions.TaskSupervisor
-  @pubsub GithubPrMentions.PubSub
-  @topic "mentions"
 
   def child_spec(lv_pid) do
     %{
@@ -32,10 +30,6 @@ defmodule GithubPrMentions.Mentions do
 
     GenServer.cast(via(lv_pid), {:set_initial_state, repo_url, username, token, lv_pid})
     GenServer.cast(via(lv_pid), {:fetch_pulls, 1})
-  end
-
-  def subscribe(content_id) do
-    Phoenix.PubSub.subscribe(@pubsub, topic(content_id))
   end
 
   def via(lv_pid) do
@@ -74,15 +68,7 @@ defmodule GithubPrMentions.Mentions do
   def handle_cast({:fetch_pulls, page}, state) do
     %{base_url: base_url, token: token} = state
 
-    pr_numbers =
-      Task.Supervisor.async(
-        @task_supervisor,
-        GitHub,
-        :fetch_pulls,
-        [base_url, token, page],
-        shutdown: :brutal_kill
-      )
-      |> Task.await()
+    pr_numbers = fetch_pulls(base_url, token, page)
 
     unless pr_numbers == [] do
       mentions_to_fetch = Enum.map(pr_numbers, &{&1, 1})
@@ -106,7 +92,7 @@ defmodule GithubPrMentions.Mentions do
     else
       mentions_to_fetch =
         Enum.map(mentions, fn {pr_number, mentions, page} ->
-          broadcast_new_mentions({pr_number, mentions, username})
+          send(state.id, {:new_mentions, pr_number, mentions})
 
           {pr_number, page + 1}
         end)
@@ -138,15 +124,15 @@ defmodule GithubPrMentions.Mentions do
     %{state | timer: Process.send_after(pid, :refresh_mentions, state.interval)}
   end
 
-  defp topic(content_id), do: "#{@topic}:#{content_id}"
-
-  defp broadcast_new_mentions({pr_number, mentions, username}) do
-    Phoenix.PubSub.broadcast_from!(
-      @pubsub,
-      self(),
-      topic("lobby"),
-      {__MODULE__, :new_mentions, {pr_number, mentions, username}}
+  defp fetch_pulls(base_url, token, page) do
+    Task.Supervisor.async(
+      @task_supervisor,
+      GitHub,
+      :fetch_pulls,
+      [base_url, token, page],
+      shutdown: :brutal_kill
     )
+    |> Task.await()
   end
 
   defp fetch_mentions(prs_data, base_url, token, username) do

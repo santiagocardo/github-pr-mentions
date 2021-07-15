@@ -7,8 +7,6 @@ defmodule GithubPrMentionsWeb.MentionsLive do
   def mount(%{"repo" => repo, "username" => username}, %{"current_user" => current_user}, socket) do
     Mentions.get_mentions(repo, username, current_user.access_token, self())
 
-    if connected?(socket), do: Mentions.subscribe("lobby")
-
     {:ok,
      socket
      |> assign(prs: [], username: username)
@@ -16,16 +14,12 @@ defmodule GithubPrMentionsWeb.MentionsLive do
   end
 
   @impl true
-  def handle_info({Mentions, :new_mentions, {pr_number, mentions, username}}, socket) do
-    if username == socket.assigns.username do
-      send_update(GithubPrMentionsWeb.ShowMentions, id: pr_number, mentions: mentions)
+  def handle_info({:new_mentions, pr_number, mentions}, socket) do
+    send_update(GithubPrMentionsWeb.ShowMentions, id: pr_number, mentions: mentions)
 
-      {:noreply,
-       socket
-       |> assign(:prs, [pr_number])
-       |> put_flash(:info, "Looking for more mentions...")}
-    else
-      {:noreply, socket}
-    end
+    {:noreply,
+     socket
+     |> assign(:prs, [pr_number])
+     |> put_flash(:info, "Looking for more mentions...")}
   end
 end
